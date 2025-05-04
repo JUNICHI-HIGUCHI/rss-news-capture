@@ -1,33 +1,35 @@
 name: Collect RSS Feeds
 
 on:
-  schedule:
-    - cron: '0 */3 * * *'  # 毎日3時間おきに実行（UTC）
-  workflow_dispatch:
+  workflow_dispatch:  # 手動実行用トリガー
 
 jobs:
   collect:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Check out code
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install feedparser pandas
+    - name: Install dependencies
+      run: pip install feedparser pandas
 
-      - name: Run RSS collector
-        run: python rss_crawler.py
+    - name: Run RSS collector
+      run: python rss_crawler.py
 
-      - name: Commit results
-        run: |
-          git config --global user.name 'rss-bot'
-          git config --global user.email 'bot@example.com'
-          git add logs/
-          git commit -m "Update RSS logs" || echo "No changes"
-          git push
+    - name: Commit results
+      run: |
+        git config --global user.name 'rss-bot'
+        git config --global user.email 'rss@example.com'
+        git pull --rebase origin main
+        git add logs/*.csv
+        git commit -m "Update RSS logs"
+        git push
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
