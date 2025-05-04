@@ -3,6 +3,9 @@ name: Collect RSS Feeds
 on:
   workflow_dispatch:  # 手動実行用トリガー
 
+permissions:
+  contents: write 
+
 jobs:
   collect:
     runs-on: ubuntu-latest
