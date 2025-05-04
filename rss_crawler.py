@@ -12,8 +12,8 @@ DATE_STR = datetime.utcnow().strftime("%Y-%m-%d")
 # RSS取得対象（ロイター除く）
 RSS_FEEDS = {
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
-    "Associated Press": "https://apnews.com/rss",
-    "Investopedia": "https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline"
+    "Associated Press": "https://apnews.com/apf-topnews?format=RSS",
+    "Investopedia": "https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_news"
 }
 
 # ロイターのスクレイピング対象URL（ワールドニュース）
@@ -25,14 +25,23 @@ def collect_rss():
 
     # RSS経由の取得
     for site, url in RSS_FEEDS.items():
-        feed = feedparser.parse(url)
-        for i, entry in enumerate(feed.entries):
-            all_entries.append({
-                "site": site,
-                "rank": i + 1,
-                "title": entry.title,
-                "link": entry.link
-            })
+        print(f"[{site}] fetching {url}")
+        try:
+            feed = feedparser.parse(url, request_headers={'User-Agent': 'Mozilla/5.0'})
+            if feed.bozo:
+                print(f"[{site} ERROR] feedparser failed: {feed.bozo_exception}")
+                continue
+            print(f"[{site}] {len(feed.entries)} entries retrieved")
+
+            for i, entry in enumerate(feed.entries):
+                all_entries.append({
+                    "site": site,
+                    "rank": i + 1,
+                    "title": entry.title,
+                    "link": entry.link
+                })
+        except Exception as e:
+            print(f"[{site} ERROR] Exception occurred: {e}")
 
     # ロイターのスクレイピング処理
     try:
@@ -40,7 +49,7 @@ def collect_rss():
         response = requests.get(REUTERS_URL, headers=headers)
         soup = BeautifulSoup(response.content, "html.parser")
 
-        articles = soup.select("article a[href*='/world/']")  # リンクに /world/ を含むものを抽出
+        articles = soup.select("article a[href*='/world/']")
         seen_links = set()
 
         for i, a_tag in enumerate(articles):
@@ -58,15 +67,19 @@ def collect_rss():
                 "title": title,
                 "link": full_url
             })
-            if i >= 19:  # 上位20件程度で打ち切る（調整可）
+            if i >= 19:
                 break
+
+        print(f"[Reuters] {len(seen_links)} articles parsed")
+
     except Exception as e:
-        print(f"[Reuters Error] {e}")
+        print(f"[Reuters ERROR] {e}")
 
     # 保存
     df = pd.DataFrame(all_entries)
-    df.to_csv(f"{FOLDER}/rss_{DATE_STR}.csv", index=False)
-    print(f"✅ Saved {len(all_entries)} items ➜ logs/rss_{DATE_STR}.csv")
+    output_path = f"{FOLDER}/rss_{DATE_STR}.csv"
+    df.to_csv(output_path, index=False)
+    print(f"✅ Saved {len(all_entries)} items ➜ {output_path}")
 
 if __name__ == "__main__":
     collect_rss()
