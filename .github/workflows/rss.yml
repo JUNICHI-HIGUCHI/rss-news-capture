@@ -27,7 +27,7 @@ jobs:
         run: python rss_crawler.py
 
       - name: Commit results
-         run: |
+        run: |
           git config --global user.name 'rss-bot'
           git config --global user.email 'rss-bot@example.com'
           git fetch origin main
@@ -35,3 +35,4 @@ jobs:
           git add logs/
           git commit -m "Update RSS logs" || echo "No changes to commit"
           git push origin main
+
