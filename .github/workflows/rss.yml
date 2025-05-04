@@ -26,11 +26,11 @@ jobs:
     - name: Run RSS collector
       run: python rss_crawler.py
 
-    - name: Commit results
+ - name: Commit results
       run: |
         git config --global user.name 'rss-bot'
         git config --global user.email 'rss-bot@example.com'
-        git pull --rebase || true
+        git pull --rebase --autostash || true
         git add logs/
         git commit -m "Update RSS logs" || echo "No changes to commit"
         git push
