@@ -31,8 +31,7 @@ jobs:
         git config --global user.email 'rss@example.com'
         git pull --rebase origin main
         git add logs/*.csv
-        git commit -m "Update RSS logs"
-        git push
+        git commit -m "Update RSS logs" || echo "No changes to commit"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
