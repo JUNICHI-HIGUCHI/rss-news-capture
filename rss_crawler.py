@@ -5,29 +5,28 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-# 出力フォルダと日付
+# 出力フォルダとファイル名（UTC日時で一意に）
 FOLDER = "logs"
-DATE_STR = datetime.utcnow().strftime("%Y-%m-%d")
+DATE_STR = datetime.utcnow().strftime("%Y-%m-%d_%H%M")
 
-# RSS取得対象（ロイター除く）
+# 各媒体の取得先
 RSS_FEEDS = {
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
-    "Associated Press": "https://apnews.com/apf-topnews?format=RSS",
-    "Investopedia": "https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_news"
+    "Associated Press": "https://feeds.apnews.com/apf-topnews"
 }
 
-# ロイターのスクレイピング対象URL（ワールドニュース）
+INVESTOPEDIA_URL = "https://www.investopedia.com/news/"
 REUTERS_URL = "https://www.reuters.com/world/"
 
 def collect_rss():
     os.makedirs(FOLDER, exist_ok=True)
     all_entries = []
 
-    # RSS経由の取得
+    # RSS取得（Al Jazeera, AP）
     for site, url in RSS_FEEDS.items():
         print(f"[{site}] fetching {url}")
         try:
-            feed = feedparser.parse(url, request_headers={'User-Agent': 'Mozilla/5.0'})
+            feed = feedparser.parse(url, request_headers={"User-Agent": "Mozilla/5.0"})
             if feed.bozo:
                 print(f"[{site} ERROR] feedparser failed: {feed.bozo_exception}")
                 continue
@@ -41,26 +40,49 @@ def collect_rss():
                     "link": entry.link
                 })
         except Exception as e:
-            print(f"[{site} ERROR] Exception occurred: {e}")
+            print(f"[{site} ERROR] {e}")
 
-    # ロイターのスクレイピング処理
+    # Investopedia（HTMLスクレイピング）
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(REUTERS_URL, headers=headers)
+        print(f"[Investopedia] fetching {INVESTOPEDIA_URL}")
+        response = requests.get(INVESTOPEDIA_URL, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(response.content, "html.parser")
 
-        articles = soup.select("article a[href*='/world/']")
-        seen_links = set()
+        articles = soup.select("a[data-analytics-link='article']")[:20]
+        print(f"[Investopedia] {len(articles)} entries retrieved")
 
-        for i, a_tag in enumerate(articles):
+        for i, a in enumerate(articles):
+            title = a.get_text(strip=True)
+            link = a["href"]
+            full_url = link if link.startswith("http") else f"https://www.investopedia.com{link}"
+            all_entries.append({
+                "site": "Investopedia",
+                "rank": i + 1,
+                "title": title,
+                "link": full_url
+            })
+    except Exception as e:
+        print(f"[Investopedia ERROR] {e}")
+
+    # Reuters（HTMLスクレイピング）
+    try:
+        print(f"[Reuters] fetching {REUTERS_URL}")
+        response = requests.get(REUTERS_URL, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        articles = soup.select("a[href^='/world/'] h3")
+        seen = set()
+
+        for i, h3 in enumerate(articles):
+            a_tag = h3.find_parent("a")
+            title = h3.get_text(strip=True)
             href = a_tag.get("href")
-            title = a_tag.get_text(strip=True)
             if not href or not title:
                 continue
             full_url = f"https://www.reuters.com{href}" if href.startswith("/") else href
-            if full_url in seen_links:
+            if full_url in seen:
                 continue
-            seen_links.add(full_url)
+            seen.add(full_url)
             all_entries.append({
                 "site": "Reuters",
                 "rank": i + 1,
@@ -70,8 +92,7 @@ def collect_rss():
             if i >= 19:
                 break
 
-        print(f"[Reuters] {len(seen_links)} articles parsed")
-
+        print(f"[Reuters] {len(seen)} articles parsed")
     except Exception as e:
         print(f"[Reuters ERROR] {e}")
 
