@@ -1,10 +1,9 @@
 name: Collect RSS Feeds
 
 on:
-  workflow_dispatch:  # 手動実行用トリガー
-
-permissions:
-  contents: write 
+  schedule:
+    - cron: "0 */3 * * *"  # 3時間おきに実行
+  workflow_dispatch:
 
 jobs:
   collect:
@@ -17,10 +16,12 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: "3.10"
 
     - name: Install dependencies
-      run: pip install feedparser pandas
+      run: |
+        python -m pip install --upgrade pip
+        pip install feedparser pandas requests beautifulsoup4
 
     - name: Run RSS collector
       run: python rss_crawler.py
@@ -28,10 +29,8 @@ jobs:
     - name: Commit results
       run: |
         git config --global user.name 'rss-bot'
-        git config --global user.email 'rss@example.com'
-        git pull --rebase origin main
-        git add logs/*.csv
+        git config --global user.email 'rss-bot@example.com'
+        git pull --rebase || true
+        git add logs/
         git commit -m "Update RSS logs" || echo "No changes to commit"
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+        git push
